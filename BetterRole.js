@@ -1,0 +1,70 @@
+const { Client, GatewayIntentBits, SlashCommandBuilder, REST, Routes } = require('discord.js');
+require('dotenv').config();
+const TOKEN = 'process.env.TOKEN';
+const CLIENT_ID = 'process.env.CLIENT_ID';
+const GUILD_ID = 'process.env.GUILD_ID';
+const ALLOWED_ROLE_ID = 'process.env.ALLOWED_ROLE_ID';
+
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.GuildMembers
+  ]
+});
+
+const commands = [
+  new SlashCommandBuilder()
+    .setName('darrol')
+    .setDescription('Da un rol a todos los usuarios en tu canal de voz')
+    .addRoleOption(option =>
+      option.setName('rol')
+        .setDescription('El rol que quieres asignar')
+        .setRequired(true)
+    )
+];
+
+const rest = new REST({ version: '10' }).setToken(TOKEN);
+
+(async () => {
+  await rest.put(
+    Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
+    { body: commands }
+  );
+  console.log('✅ Comando registrado');
+})();
+
+client.on('ready', () => {
+  console.log(`🤖 Bot listo como ${client.user.tag}`);
+});
+
+client.on('interactionCreate', async interaction => {
+  if (!interaction.isChatInputCommand()) return;
+
+  if (interaction.commandName === 'darrol') {
+    if (!interaction.member.roles.cache.has(ALLOWED_ROLE_ID)) {
+      return interaction.reply({
+        content: '❌ No tienes permiso para usar este comando.',
+        ephemeral: true
+      });
+    }
+
+    const role = interaction.options.getRole('rol');
+    const member = interaction.member;
+    const voiceChannel = member.voice.channel;
+
+    if (!voiceChannel) {
+      return interaction.reply({ content: '⚠️ Debes estar en un canal de voz para usar este comando.', ephemeral: true });
+    }
+
+    const membersInChannel = voiceChannel.members;
+
+    membersInChannel.forEach(member => {
+      member.roles.add(role).catch(console.error);
+    });
+
+    interaction.reply(`✅ Rol **${role.name}** asignado a ${membersInChannel.size} usuarios.`);
+  }
+});
+
+client.login(TOKEN);
